@@ -1,0 +1,2 @@
+class NoSolutionError(Exception):
+    pass
