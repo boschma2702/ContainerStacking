@@ -10,7 +10,7 @@ is used to evaluate the ADP approaches. The second file is used to evaluate the 
 heuristics. Each file has a set of flags that can be used to change settings in the 
 run algorithm. 
 
-##ADP (`evaluate_algorithm.py`)
+## ADP (`evaluate_algorithm.py`)
 The following command line arguments are available when running `evaluate_algorithm.py`:
 - **-N**, _default=151_. The number of training iterations run +1. A value of 151 yields 150 iterations.
 - **-e**, _default=150_. The number of evaluation runs during evaluating.
@@ -44,7 +44,7 @@ under the folder by the name of the algorithm. The algorithm name will contain t
 used when a different value than the default is picked. The folder `final` within `evaluation` 
 will contain the final results of each algorithm. 
 
-##Heuristic
+## Heuristic
 The following command line arguments are available when running `evaluate_heuristic.py`:
 - **-e**, _default=150_. The number of evaluation runs during evaluating.
 - **-a**, _required_. The algorithm evaluated. Available algorithms:     
@@ -79,20 +79,20 @@ is as follows:
 
 
 
-##Events
+## Events
 The events is a JSON list. This list contains multiple batches (also a JSON list).
 Each batch consist in turn out of containers. A container, again, is a JSON list.
 Both types are explained in more details in the sections below. The events denote the 
 problem instance as it contains all the batches (in order) and all containers belonging
 to these batches.
 
-###Batch
+### Batch
 A batch is a list of containers. Each batch is either inbound or outbound. This means that
 all containers within a batch are inbound or outbound (never mixed). The index of the batch
 indicate wether the batch is in- or out-bound. An even index (0, 2, 4, ...) denotes an inbound batch.
 An uneven number indicates a outbound batch. 
 
-###Container
+### Container
 A container is always a JSON list consisting out of three integer elements. 
 The first element is the ID of the container. This is unique between all containers.
 The second element denotes the batch in which this container departs. Using this number,
@@ -103,7 +103,7 @@ the order of a batch is not yet known. Therefore all order numbers are set to -1
 indicate that the order is not yet known. 
 
 
-##Training Events
+## Training Events
 For each problem instance, 250 training samples are generated. Therefore, the training 
 events is a JSON list of realisations. A realisation is formatted the same as an problem 
 instance (both a list of batches), but now the order within a batch is set. 
