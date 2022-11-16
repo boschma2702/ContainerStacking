@@ -33,19 +33,25 @@ class ADPSettings:
     DEFAULT_EPSILON = 0.05
     DEFAULT_CONSTANT = 1.0
     DEFAULT_OPTIMIZED = False
+    DEFAULT_CORRIDOR = -1
+    DEFAULT_CORRIDOR_FEATURE = -1
 
     def __init__(self, discount_factor: float = DEFAULT_DISCOUNT_FACTOR,
                  init_weight: float = DEFAULT_INIT_WEIGHT,
                  delta: float = DEFAULT_DELTA,
                  epsilon: float = DEFAULT_EPSILON,
                  optimized: bool = DEFAULT_OPTIMIZED,
-                 constant: float = DEFAULT_CONSTANT):
+                 constant: float = DEFAULT_CONSTANT,
+                 corridor: int = DEFAULT_CORRIDOR,
+                 corridor_feature: int = DEFAULT_CORRIDOR_FEATURE):
         self.discount_factor = discount_factor
         self.init_weight = init_weight
         self.delta = delta
         self.epsilon = epsilon
         self.optimized = optimized
         self.constant = constant
+        self.corridor = corridor
+        self.corridor_feature = corridor_feature
 
     def get_name(self, base_name):
         discount = "-lambda{}".format(self.discount_factor) if self.discount_factor != ADPSettings.DEFAULT_DISCOUNT_FACTOR else ""
@@ -53,8 +59,10 @@ class ADPSettings:
         delta = "-d{}".format(self.delta) if self.delta != ADPSettings.DEFAULT_DELTA else ""
         epsilon = "-eps{}".format(self.epsilon) if self.epsilon != ADPSettings.DEFAULT_EPSILON else ""
         const = "-c{}".format(self.constant) if self.constant != ADPSettings.DEFAULT_CONSTANT else ""
+        cor = "-cm{}".format(self.corridor) if self.corridor != ADPSettings.DEFAULT_CORRIDOR else ""
+        corf = "-cmf{}".format(self.corridor_feature) if self.corridor_feature != ADPSettings.DEFAULT_CORRIDOR_FEATURE else ""
         opt = "-optimized" if self.optimized != ADPSettings.DEFAULT_OPTIMIZED else ""
-        return "{}{}{}{}{}{}{}".format(base_name, discount, weight, delta, epsilon, const, opt)
+        return "{}{}{}{}{}{}{}{}{}".format(base_name, discount, weight, delta, epsilon, const, cor, corf, opt)
 
 available_algorithms = [
     "SingleFixed",
@@ -209,7 +217,8 @@ def evaluate_adp(args) -> Tuple[List[float], List[float]]:
 
     # noinspection PyUnboundLocalVariable
     adp = ADP(event, initial_terminal, single, epsilon, value_function_approx, number_sample_iterations,
-              discount_factor, True, every_th_iteration, evaluation_samples, problem_instance=instance_nr, use_optimized_outcomes=use_optimized)
+              discount_factor, True, every_th_iteration, evaluation_samples, problem_instance=instance_nr,
+              use_optimized_outcomes=use_optimized, corridor_size=adp_settings.corridor, corridor_feature=adp_settings.corridor_feature)
 
     iterations, reshuffles, init_values = extract_results(adp)
 
@@ -286,6 +295,8 @@ if __name__ == '__main__':
     parser.add_argument('-weight', default=ADPSettings.DEFAULT_INIT_WEIGHT)
     parser.add_argument('-epsilon', default=ADPSettings.DEFAULT_EPSILON)
     parser.add_argument('-constant', default=ADPSettings.DEFAULT_CONSTANT)
+    parser.add_argument('-corridor', default=ADPSettings.DEFAULT_CORRIDOR)
+    parser.add_argument('-corridorf', default=ADPSettings.DEFAULT_CORRIDOR_FEATURE)
 
 
 
@@ -298,6 +309,8 @@ if __name__ == '__main__':
     evaluation_samples = int(args.e)
     every_th_iteration = int(args.i)
     optimized = args.optimized
+    corridor = int(args.corridor)
+    corridor_feature = int(args.corridorf)
 
     discount_factor = float(args.discount)
     init_weight = float(args.weight)
@@ -314,7 +327,9 @@ if __name__ == '__main__':
         init_weight=init_weight,
         delta=delta,
         epsilon=epsilon,
-        constant=constant
+        constant=constant,
+        corridor=corridor,
+        corridor_feature=corridor_feature
     )
 
     main(alg_name, terminal_type, N, evaluation_samples, every_th_iteration, optimized, adp_settings)
