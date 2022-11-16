@@ -1,7 +1,7 @@
 import math
 import random
 from statistics import mean, stdev
-from typing import Tuple, Set, List
+from typing import Tuple, Set
 
 import numpy as np
 
@@ -17,7 +17,6 @@ from main.model.policies.policy import Policy
 
 
 class ADP(Policy):
-
     NO_SOLUTION_COST = 9999999999999999999
 
     def __init__(self,
@@ -32,7 +31,9 @@ class ADP(Policy):
                  every_th_iteration=10,
                  evaluation_samples=1000,
                  problem_instance=0,
-                 use_optimized_outcomes=False
+                 use_optimized_outcomes=False,
+                 corridor_size: int = -1,
+                 corridor_feature: int = -1
                  ):
         super().__init__(events, initial_terminal)
         # ADP settings
@@ -45,6 +46,8 @@ class ADP(Policy):
         self.N = number_sample_iterations
 
         self.use_optimized_outcomes = use_optimized_outcomes
+        self.corridor_size = corridor_size
+        self.corridor_feature = corridor_feature
 
         # evaluation settings
         self.evaluate = evaluate
@@ -63,17 +66,22 @@ class ADP(Policy):
     def handle_realized_inbound_batch(self, terminal: Terminal, realized_batch: RealizedBatch,
                                       batch_number: int) -> Tuple[Terminal, int]:
         if not self.use_optimized_outcomes:
-            return self._best_choice(terminal_unique_outcomes(terminal, realized_batch), batch_number)
+            return self._best_choice(terminal_unique_outcomes(terminal, realized_batch, self.corridor_size),
+                                     batch_number)
         else:
-            return terminal_optimized_outcome(terminal, realized_batch, self.value_function_approximator, self.n, batch_number, self.events)[:-1]
+            return terminal_optimized_outcome(terminal, realized_batch, self.value_function_approximator, self.n,
+                                              batch_number, self.events, self.corridor_size, self.corridor_feature,
+                                              False)[:-1]
 
     def handle_realized_outbound_batch(self, terminal: Terminal, realized_batch: RealizedBatch,
                                        batch_number: int) -> Tuple[Terminal, int]:
         if not self.use_optimized_outcomes:
-            return self._best_choice(terminal_unique_outcomes(terminal, realized_batch), batch_number)
+            return self._best_choice(terminal_unique_outcomes(terminal, realized_batch, self.corridor_size),
+                                     batch_number)
         else:
             return terminal_optimized_outcome(terminal, realized_batch, self.value_function_approximator, self.n,
-                                              batch_number, self.events)[:-1]
+                                              batch_number, self.events, self.corridor_size, self.corridor_feature,
+                                              False)[:-1]
 
     def _best_choice(self, outcomes: Set[Tuple[Terminal, int]], current_batch_number: int) \
             -> Tuple[Terminal, int]:
@@ -104,11 +112,17 @@ class ADP(Policy):
 
             self.value_function_approximator.on_iteration_done(self.n)
 
-            if self.problem_instance>0:
+            if self.problem_instance > 0:
                 print("Instance {}: {}/{}".format(self.problem_instance, self.n, self.N))
 
-            if self.evaluate and self.n % self.every_th_iteration == 1:
-                self.evaluate_iteration(self.n)
+            if self.evaluate:
+                # if every th iteration is the same as N, only a single evaluation at the end must be done
+                if self.N == self.every_th_iteration:
+                    if self.n == self.N:
+                        self.evaluate_iteration(self.n)
+                else:
+                    if self.n % self.every_th_iteration == 1:
+                        self.evaluate_iteration(self.n)
 
             self.n += 1
 
@@ -121,6 +135,7 @@ class ADP(Policy):
                 self.update_value_function(iteration, t, current_terminal, outcome_terminal, value)
                 current_terminal = outcome_terminal
             except NoSolutionError:
+                # noinspection PyTypeChecker
                 self.update_value_function(iteration, t, current_terminal, None, ADP.NO_SOLUTION_COST)
                 return
 
@@ -168,7 +183,7 @@ class ADP(Policy):
         min_value = math.inf
         min_terminal = None
         min_cost = math.inf
-        for (outcome_terminal, cost) in terminal_unique_outcomes(terminal, realized_batch):
+        for (outcome_terminal, cost) in terminal_unique_outcomes(terminal, realized_batch, self.corridor_size):
             # key = (batch_number+1, outcome_terminal.abstract())
             state_value = self.value_function_approximator.value_approximate(iteration, batch_number + 1,
                                                                              outcome_terminal, self.events)
@@ -188,21 +203,30 @@ class ADP(Policy):
         if p < self.epsilon:
             # explore
             if not self.use_optimized_outcomes:
-                outcomes = terminal_unique_outcomes(terminal, realized_batch)
+                outcomes = terminal_unique_outcomes(terminal, realized_batch, self.corridor_size)
                 outcome_terminal, nr_reshuffles = random.sample(outcomes, 1)[0]
                 # key = (batch_number+1, outcome_terminal.abstract())
                 state_value = self.value_function_approximator.value_approximate(iteration, batch_number + 1,
                                                                                  outcome_terminal, self.events)
                 value = nr_reshuffles + self.discount_factor * state_value
             else:
-                outcome_terminal, nr_reshuffles, value = terminal_optimized_outcome(terminal, realized_batch, self.value_function_approximator, iteration, batch_number, self.events, True)
+                outcome_terminal, nr_reshuffles, value = terminal_optimized_outcome(terminal, realized_batch,
+                                                                                    self.value_function_approximator,
+                                                                                    iteration, batch_number,
+                                                                                    self.events, self.corridor_size,
+                                                                                    self.corridor_feature,
+                                                                                    True)
         else:
             # exploit
             if not self.use_optimized_outcomes:
                 outcome_terminal, value, nr_reshuffles = self.solve_realization(iteration, terminal, realized_batch,
-                                                                            batch_number)
+                                                                                batch_number)
             else:
-                outcome_terminal, nr_reshuffles, value = terminal_optimized_outcome(terminal, realized_batch, self.value_function_approximator, iteration, batch_number, self.events)
+                outcome_terminal, nr_reshuffles, value = terminal_optimized_outcome(terminal, realized_batch,
+                                                                                    self.value_function_approximator,
+                                                                                    iteration, batch_number,
+                                                                                    self.events, self.corridor_size,
+                                                                                    self.corridor_feature, False)
 
         return outcome_terminal, value, nr_reshuffles
 
@@ -212,40 +236,30 @@ class ADP(Policy):
                               previous_terminal: Terminal,
                               new_terminal: Terminal,
                               observed_value: float):
-        self.value_function_approximator.on_sample_realization(n, t, previous_terminal, new_terminal, observed_value, self.events)
+        self.value_function_approximator.on_sample_realization(n, t, previous_terminal, new_terminal, observed_value,
+                                                               self.events)
 
     def evaluate_iteration(self, n):
         self.events.sample_count_evaluating = 0
-        # mean, std = Policy.evaluate(self,
-        #                               self.initial_terminal,
-        #                               self.events,
-        #                               nr_samples=self.evaluation_samples,
-        #                               reset=False)
         sample_results = []
         for sample_iteration in range(self.evaluation_samples):
-            # print("Evaluating iteration {}/{}".format(sample_iteration+1, self.evaluation_samples))
             try:
+                # noinspection PyUnresolvedReferences
                 sample = self.events.sample_evaluating()
                 new_terminal = self.initial_terminal
                 total_reshuffles = 0
                 for batch_number in range(self.events.length()):
-                    # print("about to handle batch: {}: {}".format(batch_number, sample.batch(batch_number)))
-                    # old_term = new_terminal
                     new_terminal, reshuffles = self.handle_realized_batch(new_terminal,
                                                                           sample.batch(batch_number),
                                                                           batch_number)
                     total_reshuffles += reshuffles
-                    # print("batch {} done, reshuffles: {}".format(batch_number, reshuffles))
 
                 sample_results.append(total_reshuffles)
             except NoSolutionError:
-                # print("No Solution")
                 sample_results.append(ADP.NO_SOLUTION_COST)
-            # self.progress_monitor.iteration_complete()
 
-        # print("Mean: {} STD: {}".format(mean(sample_results), stdev(sample_results)))
         m, std = mean(sample_results), stdev(sample_results)
-        initial_state_value = self.value_function_approximator.value_approximate(n, 0, self.initial_terminal, self.events)
+        initial_state_value = self.value_function_approximator.value_approximate(n, 0, self.initial_terminal,
+                                                                                 self.events)
 
         self.evaluation_results[n] = (m, std, initial_state_value)
-

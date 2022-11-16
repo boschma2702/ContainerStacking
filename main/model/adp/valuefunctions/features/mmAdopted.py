@@ -1,20 +1,20 @@
-from typing import Optional, List, Tuple
+from typing import Optional, List
 
 from main.model.adp.valuefunctions.features.MMRule import MM_rule
 from main.model.adp.valuefunctions.features.util.validStacks import get_valid_stacks
-from main.model.dataclass import StackLocation, Container, StackTierLocation
+from main.model.dataclass import StackLocation, Container
 from main.model.dataclass.block import Block
-from main.model.dataclass.outcomes import _reachable_right, _reachable_left, valid_store_location
+from main.model.dataclass.outcomes import _reachable_right, _reachable_left
 from main.model.dataclass.stack import Stack
 from main.model.dataclass.terminal import Terminal
 
 
-def MM_adopted_rule(terminal: Terminal) -> float:
-    return MM_rule(terminal, MM_adopted_store_container)
+def MM_adopted_rule(terminal: Terminal, included_block_indices: List[int]) -> float:
+    return MM_rule(terminal, included_block_indices, MM_adopted_store_container)
 
 
-def MM_adopted_store_container(terminal: Terminal, container: Container, to_exclude: Optional[StackLocation]) -> Terminal:
-    valid_stacks = get_valid_stacks(terminal, to_exclude) #yields a stack that is not valid as it introduces a new blocking
+def MM_adopted_store_container(terminal: Terminal, container: Container, to_exclude: Optional[StackLocation], included_block_indices: List[int]) -> Terminal:
+    valid_stacks = get_valid_stacks(terminal, to_exclude, included_block_indices) #yields a stack that is not valid as it introduces a new blocking
     # try to pick a stack that cause no new reshuffles, disregarding empty stacks
     no_reshuffle_stacks = [(stack[0].min_container(), stack[1]) for stack in valid_stacks if stack[0].height() > 0
                            and stack[0].min_container()[1] > container[1]

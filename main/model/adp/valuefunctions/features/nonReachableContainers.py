@@ -1,3 +1,6 @@
+from typing import Optional, List
+
+from main.model.adp.valuefunctions.features.util.getBlocks import get_blocks
 from main.model.dataclass.block import Block
 from main.model.dataclass.outcomes import _reachable
 from main.model.dataclass.stack import Stack
@@ -5,9 +8,9 @@ from main.model.dataclass.terminal import Terminal
 from main.model.events.events import Events
 
 
-def non_reachable_containers(terminal: Terminal, event: Events, current_batch_number: int):
+def non_reachable_containers(terminal: Terminal, event: Events, current_batch_number: int, corridor: Optional[List[int]]):
     total = 0
-    for block in terminal.blocks:
+    for block in get_blocks(terminal, corridor):
         for stack_index in range(len(block.stacks)):
             if _reachable(block, stack_index):
                 # if reachable, the topmost container can be retrieved

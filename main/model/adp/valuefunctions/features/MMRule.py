@@ -6,8 +6,8 @@ from main.model.dataclass import Container, StackLocation
 from main.model.dataclass.terminal import Terminal
 
 
-def MM_store_container(terminal: Terminal, container: Container, to_exclude: Optional[StackLocation]) -> Terminal:
-    valid_stacks = get_valid_stacks(terminal, to_exclude) #yields a stack that is not valid as it introduces a new blocking
+def MM_store_container(terminal: Terminal, container: Container, to_exclude: Optional[StackLocation], included_block_indices: List[int]) -> Terminal:
+    valid_stacks = get_valid_stacks(terminal, to_exclude, included_block_indices) #yields a stack that is not valid as it introduces a new blocking
     # try to pick a stack that cause no new reshuffles, disregarding empty stacks
     no_reshuffle_stacks = [(stack[0].min_container(), stack[1]) for stack in valid_stacks if stack[0].height() > 0 and stack[0].min_container()[1] > container[1]]
     no_reshuffle_stacks.sort()
@@ -25,9 +25,10 @@ def MM_store_container(terminal: Terminal, container: Container, to_exclude: Opt
     return terminal.store_container(least_harmful[0][1], container)
 
 
-def MM_rule(terminal: Terminal, store_container_func: Callable[[Terminal, Container, Optional[StackLocation]], Terminal] = MM_store_container) -> float:
+def MM_rule(terminal: Terminal, included_block_indices: List[int],
+            store_container_func: Callable[[Terminal, Container, Optional[StackLocation], List[int]], Terminal] = MM_store_container) -> float:
     # determine order of container retrieval
-    retrieval_order = get_all_containers(terminal)
+    retrieval_order = get_all_containers(terminal, included_block_indices)
     retrieval_order.sort(key=lambda x: x[1:])
 
     current_terminal = terminal
@@ -44,9 +45,10 @@ def MM_rule(terminal: Terminal, store_container_func: Callable[[Terminal, Contai
             for blocking_container in blocking_containers:
                 blocking_location = current_terminal.container_location(blocking_container)
                 current_terminal, _ = current_terminal.retrieve_container(blocking_location)
-                current_terminal = store_container_func(current_terminal, blocking_container, target_container_location)
+                current_terminal = store_container_func(current_terminal, blocking_container, target_container_location, included_block_indices)
 
             # retrieve target container
+            # print("retrieving: {}\n{}".format(target_container, current_terminal))
             current_terminal, _ = current_terminal.retrieve_container(target_container_location)
         except RuntimeError:
             print("target container: {}, retrieval order: {}".format(target_container, retrieval_order))
