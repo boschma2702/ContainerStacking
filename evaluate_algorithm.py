@@ -148,6 +148,8 @@ def init_terminal(terminal_type):
         return Terminal.empty_bay(200, 4)
     elif terminal_type == '6':
         return Terminal.empty_bay(20, 4)
+    elif terminal_type == '7':
+        return Terminal.empty_single_stack_block(15, 4)
     else:
         raise RuntimeError("Invalid Terminal type {} supplied".format(terminal_type))
 
@@ -161,7 +163,7 @@ def load_events(terminal_type):
         return [EvaluatableEvents.load_evaluatable_events("40_15_500_250_{}".format(i)) for i in range(1, 17)]
     elif terminal_type == '5':
         return [EvaluatableEvents.load_evaluatable_events("40_15_1000_250_{}".format(i)) for i in range(1, 17)]
-    elif terminal_type == '6':
+    elif terminal_type in ['6', '7']:
         return [EvaluatableEvents.load_evaluatable_events("40_15_100_250_{}".format(i)) for i in range(1, 17)]
 
 
@@ -213,7 +215,6 @@ def evaluate_adp(args) -> Tuple[List[float], List[float]]:
 
         # noinspection PyUnboundLocalVariable
         value_function_approx = BasisFunction(features, adp_settings.init_weight, delta=adp_settings.delta, file_writer=file_writer)
-        # value_function_approx = BasisFunction(features, 0.0, delta=0.9, file_writer=file_writer)
 
     # noinspection PyUnboundLocalVariable
     adp = ADP(event, initial_terminal, single, epsilon, value_function_approx, number_sample_iterations,
@@ -243,7 +244,6 @@ def extract_results(adp: ADP):
 
 
 def convert_result(results, iterations):
-    # print(results)
     avg_reshuffles = numpy.mean([tup[0] for tup in results], axis=0)
     avg_init_values = numpy.mean([tup[1] for tup in results], axis=0)
 
@@ -256,12 +256,10 @@ def convert_result(results, iterations):
 
 
 def main(alg_name: str, terminal_type: str, number_sample_iterations: int, evaluation_samples: int, every_th_iteration: int, use_optimized: bool, adp_settings: ADPSettings):
-    # events = [EvaluatableEvents.load_evaluatable_events("20_12_30_250_{}".format(i)) for i in range(1, 17)]
     events = load_events(terminal_type)
 
     with Pool(number_cores) as pool:
         job_args = [[alg_name, events[i], i+1, terminal_type, number_sample_iterations, evaluation_samples, every_th_iteration, use_optimized, adp_settings] for i in range(len(events))]
-        # job_args = [[alg_name, events[i], i+1, terminal_type, number_sample_iterations, evaluation_samples, every_th_iteration] for i in [0, 1]]
 
         result = pool.map(evaluate_adp, job_args)
 
@@ -286,7 +284,7 @@ if __name__ == '__main__':
     parser.add_argument('-i', default=10, help="Every ith iteration an evaluation is run")
     parser.add_argument('-c', '--cores', required=True, help="The size of the pool used. To maximize performance, give value equal to number of available cores", action="store")
     parser.add_argument('-a', '--algorithm', required=True, help="The algorithm that needs to be run", choices=available_algorithms)
-    parser.add_argument('-t', '--terminal', required=True, action="store", help="Which terminal layout needs to be used. 1=gantry, 2=reachstacker", choices=['1','2','3','4','5','6'])
+    parser.add_argument('-t', '--terminal', required=True, action="store", help="Which terminal layout needs to be used. 1=gantry, 2=reachstacker", choices=['1','2','3','4','5','6', '7'])
     parser.add_argument('-o', '--optimized', default=False, action="store_true", help="Whether optimized outcomes needs to be used")
 
 

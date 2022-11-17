@@ -1,10 +1,13 @@
+from decimal import Decimal
 from typing import Optional, List, Callable
 
 from main.model.adp.valuefunctions.features.util.getAllContainers import get_all_containers
 from main.model.adp.valuefunctions.features.util.validStacks import get_valid_stacks
 from main.model.dataclass import Container, StackLocation
 from main.model.dataclass.terminal import Terminal
+from main.model.noSolutionError import NoSolutionError
 
+NO_SOLUTION_COST = 100
 
 def MM_store_container(terminal: Terminal, container: Container, to_exclude: Optional[StackLocation], included_block_indices: List[int]) -> Terminal:
     valid_stacks = get_valid_stacks(terminal, to_exclude, included_block_indices) #yields a stack that is not valid as it introduces a new blocking
@@ -22,6 +25,19 @@ def MM_store_container(terminal: Terminal, container: Container, to_exclude: Opt
     # find least harmful stack by selecting the stack that has the latest first departing container
     least_harmful = [(stack[0].min_container(), stack[1]) for stack in valid_stacks]
     least_harmful.sort(reverse=True)
+    if len(least_harmful) == 0:
+        # print('Im about to crasch')
+        # print(least_harmful)
+        # print(valid_stacks)
+        # print('terminal')
+        # print(terminal)
+        # print('container')
+        # print(container)
+        # print(f"to exclude: ${to_exclude}")
+        # print(f"included indices: ${included_block_indices}")
+        # print(least_harmful[0])
+        # print(least_harmful[0][1])
+        raise NoSolutionError("No solution found")
     return terminal.store_container(least_harmful[0][1], container)
 
 
@@ -50,6 +66,11 @@ def MM_rule(terminal: Terminal, included_block_indices: List[int],
             # retrieve target container
             # print("retrieving: {}\n{}".format(target_container, current_terminal))
             current_terminal, _ = current_terminal.retrieve_container(target_container_location)
+        except NoSolutionError:
+            print('no sultion found in MMRule feature')
+            total_reshuffles = NO_SOLUTION_COST
+            break
+
         except RuntimeError:
             print("target container: {}, retrieval order: {}".format(target_container, retrieval_order))
             print("start terminal:\n{}".format(terminal))
