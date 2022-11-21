@@ -25,6 +25,7 @@ class ADP(Policy):
                  single: bool,
                  epsilon: float,
                  value_function_approx: ValueFunctionApproximate,
+                 container_labels: dict,
                  number_sample_iterations=250,
                  discount_factor=1,
                  evaluate: bool = False,
@@ -58,6 +59,8 @@ class ADP(Policy):
         self.evaluation_results = {}
         self.problem_instance = problem_instance
 
+        self.container_labels = container_labels
+
         self.determine_approximate_values()
 
     ########################################################################################
@@ -66,22 +69,24 @@ class ADP(Policy):
     def handle_realized_inbound_batch(self, terminal: Terminal, realized_batch: RealizedBatch,
                                       batch_number: int) -> Tuple[Terminal, int]:
         if not self.use_optimized_outcomes:
-            return self._best_choice(terminal_unique_outcomes(terminal, realized_batch, self.corridor_size),
-                                     batch_number)
+            return self._best_choice(
+                terminal_unique_outcomes(terminal, realized_batch, self.corridor_size, self.container_labels),
+                batch_number
+            )
         else:
             return terminal_optimized_outcome(terminal, realized_batch, self.value_function_approximator, self.n,
                                               batch_number, self.events, self.corridor_size, self.corridor_feature,
-                                              False)[:-1]
+                                              False, self.container_labels)[:-1]
 
     def handle_realized_outbound_batch(self, terminal: Terminal, realized_batch: RealizedBatch,
                                        batch_number: int) -> Tuple[Terminal, int]:
         if not self.use_optimized_outcomes:
-            return self._best_choice(terminal_unique_outcomes(terminal, realized_batch, self.corridor_size),
+            return self._best_choice(terminal_unique_outcomes(terminal, realized_batch, self.corridor_size, self.container_labels),
                                      batch_number)
         else:
             return terminal_optimized_outcome(terminal, realized_batch, self.value_function_approximator, self.n,
                                               batch_number, self.events, self.corridor_size, self.corridor_feature,
-                                              False)[:-1]
+                                              False, self.container_labels)[:-1]
 
     def _best_choice(self, outcomes: Set[Tuple[Terminal, int]], current_batch_number: int) \
             -> Tuple[Terminal, int]:
@@ -183,7 +188,7 @@ class ADP(Policy):
         min_value = math.inf
         min_terminal = None
         min_cost = math.inf
-        for (outcome_terminal, cost) in terminal_unique_outcomes(terminal, realized_batch, self.corridor_size):
+        for (outcome_terminal, cost) in terminal_unique_outcomes(terminal, realized_batch, self.corridor_size, self.container_labels):
             # key = (batch_number+1, outcome_terminal.abstract())
             state_value = self.value_function_approximator.value_approximate(iteration, batch_number + 1,
                                                                              outcome_terminal, self.events)
@@ -203,7 +208,7 @@ class ADP(Policy):
         if p < self.epsilon:
             # explore
             if not self.use_optimized_outcomes:
-                outcomes = terminal_unique_outcomes(terminal, realized_batch, self.corridor_size)
+                outcomes = terminal_unique_outcomes(terminal, realized_batch, self.corridor_size, self.container_labels)
                 outcome_terminal, nr_reshuffles = random.sample(outcomes, 1)[0]
                 # key = (batch_number+1, outcome_terminal.abstract())
                 state_value = self.value_function_approximator.value_approximate(iteration, batch_number + 1,
@@ -215,7 +220,7 @@ class ADP(Policy):
                                                                                     iteration, batch_number,
                                                                                     self.events, self.corridor_size,
                                                                                     self.corridor_feature,
-                                                                                    True)
+                                                                                    True, self.container_labels)
         else:
             # exploit
             if not self.use_optimized_outcomes:
@@ -226,7 +231,8 @@ class ADP(Policy):
                                                                                     self.value_function_approximator,
                                                                                     iteration, batch_number,
                                                                                     self.events, self.corridor_size,
-                                                                                    self.corridor_feature, False)
+                                                                                    self.corridor_feature, False,
+                                                                                    self.container_labels)
 
         return outcome_terminal, value, nr_reshuffles
 

@@ -217,7 +217,9 @@ def evaluate_adp(args) -> Tuple[List[float], List[float]]:
         value_function_approx = BasisFunction(features, adp_settings.init_weight, delta=adp_settings.delta, file_writer=file_writer)
 
     # noinspection PyUnboundLocalVariable
-    adp = ADP(event, initial_terminal, single, epsilon, value_function_approx, number_sample_iterations,
+    # container_dict = {1: 0, 2: 1} # key is container id, value is label. Label 0 means container may be placed
+    # everywhere, other numbers need to match
+    adp = ADP(event, initial_terminal, single, epsilon, value_function_approx, {}, number_sample_iterations,
               discount_factor, True, every_th_iteration, evaluation_samples, problem_instance=instance_nr,
               use_optimized_outcomes=use_optimized, corridor_size=adp_settings.corridor, corridor_feature=adp_settings.corridor_feature)
 

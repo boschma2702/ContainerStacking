@@ -1,3 +1,4 @@
+import random
 from typing import Tuple, List
 
 import json
@@ -14,12 +15,16 @@ from main.util import writeToFile, sub_folder_file, sub_folder
 
 class EvaluatableEvents(Events):
 
-    def __init__(self, batches: Tuple[Batch], training_events: List[RealizedEvents], evaluating_events: List[RealizedEvents]):
+    def __init__(self, batches: Tuple[Batch],
+                 training_events: List[RealizedEvents],
+                 evaluating_events: List[RealizedEvents],
+                 container_labels):
         super().__init__(batches)
         self.sample_count_training = 0
         self.sample_count_evaluating = 0
         self.training_events = training_events
         self.evaluating_events = evaluating_events
+        self.container_labels = container_labels
 
     def sample(self) -> RealizedEvents:
         return self._get_training_sample()
@@ -46,7 +51,7 @@ class EvaluatableEvents(Events):
     @classmethod
     def create_from_ids(cls, batches, nr_samples=1000):
         events = Events.create(batches)
-        return cls(events.batches, [events.sample() for i in range(nr_samples)], [events.sample() for i in range(nr_samples)])
+        return cls(events.batches, [events.sample() for i in range(nr_samples)], [events.sample() for i in range(nr_samples)], {})
 
     @staticmethod
     def load_evaluatable_events(filename: str, extension="json", directory=sub_folder("events")):
@@ -69,7 +74,8 @@ class EvaluatableEvents(Events):
                 )
                 for sample in data['evaluating_events']
             ]
-            return EvaluatableEvents(ev, training_events, evaluating_events)
+            container_labels = data.get('container_labels', {})
+            return EvaluatableEvents(ev, training_events, evaluating_events, container_labels)
 
 
     @staticmethod
@@ -80,7 +86,8 @@ class EvaluatableEvents(Events):
         d = {
             "events": EvaluatableEvents.convert_events_to_lists(self.batches),
             "training_events": [EvaluatableEvents.convert_events_to_lists(training_event.batches) for training_event in self.training_events],
-            "evaluating_events": [EvaluatableEvents.convert_events_to_lists(evaluating_event.batches) for evaluating_event in self.evaluating_events]
+            "evaluating_events": [EvaluatableEvents.convert_events_to_lists(evaluating_event.batches) for evaluating_event in self.evaluating_events],
+            "container_labels": self.container_labels
         }
         writeToFile(filename, json.dumps(d, cls=NumpyEncoder), extension="json", base_path=directory)
 
@@ -89,20 +96,29 @@ class EvaluatableEvents(Events):
         return [[list(container) for container in batch.containers] for batch in batches]
 
     @classmethod
-    def create_evaluatable_batches(cls, period_slots, dwell_time, number_of_containers, nr_samples=1000):
+    def create_evaluatable_batches(cls, period_slots, dwell_time, number_of_containers, nr_samples=1000, nr_special=0):
         events = generate_events(period_slots, dwell_time, number_of_containers)
         training_events = [events.sample() for i in range(nr_samples)]
         evaluating_events = [events.sample() for i in range(nr_samples)]
-        return cls(events.batches, training_events, evaluating_events)
+
+        container_labels = {}
+        batches = [batch.containers for batch in events.batches]
+        container_ids = list(set([container[0] for sublist in batches for container in sublist]))
+        special_container_ids = random.sample(container_ids, nr_special)
+        for container_id in container_ids:
+            container_labels[container_id] = 0
+        for container_id in special_container_ids:
+            container_labels[container_id] = 1
+
+        return cls(events.batches, training_events, evaluating_events, container_labels)
 
 
-# events = EvaluatableEvents.create_evaluatable_batches(8,3,10)
-# print(EvaluatableEvents.load_evaluatable_events("test"))
-# writeToFile("test", events.write_evaluatable_events(), extension="json")
-
-# first = events.sample()
-# print(first)
-# print(events.sample())
-# print(events.sample())
-# events.reset()
-# print(first == events.sample())
+# for i in range(1, 17):
+#     periods = 40
+#     dwell = 15
+#     nr_containers = 100
+#     nr_samples = 250
+#     nr_special = 10
+#
+#     events = EvaluatableEvents.create_evaluatable_batches(periods, dwell, nr_containers, nr_samples, nr_special)
+#     events.write_evaluatable_events("{}_{}_{}_{}_{}-{}".format(periods, dwell, nr_containers, nr_samples, i, nr_special))

@@ -5,7 +5,7 @@ from typing import Tuple, Optional, List
 from main.model.adp.valuefunctions.valueFunctionApproximation import ValueFunctionApproximate
 from main.model.batch.realizedBatch import RealizedBatch
 from main.model.dataclass import Container, StackLocation, StackTierLocation
-from main.model.dataclass.outcomes import valid_store_location, corridor
+from main.model.dataclass.outcomes import valid_store_location, corridor, container_allowed_in_block
 from main.model.dataclass.terminal import Terminal
 from main.model.events.events import Events
 from main.model.noSolutionError import NoSolutionError
@@ -19,16 +19,17 @@ def terminal_optimized_outcome(terminal: Terminal,
                                event: Events,
                                corridor_size: int,
                                corridor_size_feature: int,
-                               random_choice: bool) \
+                               random_choice: bool,
+                               container_labels: dict) \
         -> Tuple[Terminal, int, float]:
     if batch.length() == 0:
         return terminal, 0, value_function_approx.value_approximate(n, t, terminal, event)
     if batch.inbound:
         return _optimized_inbound_outcome(terminal, batch, value_function_approx, n, t, event, random_choice,
-                                          corridor_size, corridor_size_feature)
+                                          corridor_size, corridor_size_feature, container_labels)
     else:
         return _optimized_outbound_outcome(terminal.reveal_order(batch.containers), batch, value_function_approx, n, t,
-                                           event, random_choice, corridor_size, corridor_size_feature)
+                                           event, random_choice, corridor_size, corridor_size_feature, container_labels)
 
 
 def _optimized_inbound_outcome(initial_terminal: Terminal,
@@ -39,7 +40,8 @@ def _optimized_inbound_outcome(initial_terminal: Terminal,
                                event: Events,
                                random_choice: bool,
                                corridor_size: int,
-                               corridor_size_feature: int) -> Tuple[Terminal, int, float]:
+                               corridor_size_feature: int,
+                               container_labels: dict) -> Tuple[Terminal, int, float]:
     current_terminal = initial_terminal
     value = None
     for target_container in batch.containers:
@@ -47,10 +49,10 @@ def _optimized_inbound_outcome(initial_terminal: Terminal,
         if not random_choice:
             current_terminal, value = optimized_store_location(current_terminal, value_function_approx, n, t, event,
                                                                target_container, None, corridor_size,
-                                                               corridor_size_feature)
+                                                               corridor_size_feature, container_labels)
         else:
             # pick random spot
-            valid_locations = valid_store_locations(current_terminal, None, corridor_size)
+            valid_locations = valid_store_locations(current_terminal, None, corridor_size, target_container, container_labels)
             stack_location = random.choice(valid_locations)
             current_terminal = current_terminal.store_container(stack_location, target_container)
             value = value_function_approx.value_approximate(n, t, current_terminal, event)
@@ -66,7 +68,8 @@ def _optimized_outbound_outcome(initial_terminal: Terminal,
                                 event: Events,
                                 random_choice: bool,
                                 corridor_size: int,
-                                corridor_size_feature: int) \
+                                corridor_size_feature: int,
+                                container_labels: dict) \
         -> Tuple[Terminal, int, float]:
     current_terminal = initial_terminal
     reshuffles = 0
@@ -84,7 +87,8 @@ def _optimized_outbound_outcome(initial_terminal: Terminal,
                 if not random_choice:
                     current_terminal, value = optimized_store_location(term, value_function_approx, n, t, event,
                                                                        blocking_container, target_location,
-                                                                       corridor_size, corridor_size_feature)
+                                                                       corridor_size, corridor_size_feature,
+                                                                       container_labels)
                 else:
                     # Reshuffle to random locations
                     valid_locations = valid_store_locations(current_terminal, target_location, corridor_size)
@@ -106,7 +110,8 @@ def optimized_store_location(terminal: Terminal,
                              container: Container,
                              exclude_target_stack_tier_location: Optional[StackTierLocation],
                              corridor_size: int,
-                             corridor_size_feature: int
+                             corridor_size_feature: int,
+                             container_labels: dict
                              ) -> Tuple[Terminal, float]:
     min_value = math.inf
     min_terminal = None
@@ -120,15 +125,16 @@ def optimized_store_location(terminal: Terminal,
 
     for block_index in corridor_list:
         block = terminal.blocks[block_index]
-        for stack_index in range(len(block.stacks)):
-            stack_location = (block_index, stack_index)
-            # check if container may be placed in this location
-            if valid_store_location(terminal, stack_location, exclude_target_stack_tier_location):
-                new_term = terminal.store_container((block_index, stack_index), container)
-                value = value_function_approx.value_approximate(n, t, new_term, event, corridor_list_feature)
-                if value < min_value:
-                    min_value = value
-                    min_terminal = new_term
+        if container_allowed_in_block(block, container_labels[container[0]]):
+            for stack_index in range(len(block.stacks)):
+                stack_location = (block_index, stack_index)
+                # check if container may be placed in this location
+                if valid_store_location(terminal, stack_location, exclude_target_stack_tier_location):
+                    new_term = terminal.store_container((block_index, stack_index), container)
+                    value = value_function_approx.value_approximate(n, t, new_term, event, corridor_list_feature)
+                    if value < min_value:
+                        min_value = value
+                        min_terminal = new_term
 
     if min_terminal is None:
         raise NoSolutionError("Could not find suitable solutions for container: {}\n terminal:\n{}"
@@ -137,15 +143,17 @@ def optimized_store_location(terminal: Terminal,
 
 
 def valid_store_locations(terminal: Terminal, exclude_target_stack_tier_location: Optional[StackTierLocation],
-                          corridor_size: int) -> List[StackLocation]:
+                          corridor_size: int, container_to_store: Tuple[int, int, int], container_labels: dict) \
+        -> List[StackLocation]:
     valid_locations = []
     for block_index in corridor(terminal, exclude_target_stack_tier_location, corridor_size):
         block = terminal.blocks[block_index]
-        for stack_index in range(len(block.stacks)):
-            stack_location = (block_index, stack_index)
-            # check if container may be placed in this location
-            if valid_store_location(terminal, stack_location, exclude_target_stack_tier_location):
-                valid_locations.append(stack_location)
+        if container_allowed_in_block(block, container_labels[container_to_store[0]]):
+            for stack_index in range(len(block.stacks)):
+                stack_location = (block_index, stack_index)
+                # check if container may be placed in this location
+                if valid_store_location(terminal, stack_location, exclude_target_stack_tier_location):
+                    valid_locations.append(stack_location)
 
     if len(valid_locations) == 0:
         raise NoSolutionError("Could not find suitable solutions for (to exclude: {}) terminal:\n{}"
