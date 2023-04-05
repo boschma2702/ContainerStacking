@@ -33,19 +33,25 @@ class ADPSettings:
     DEFAULT_EPSILON = 0.05
     DEFAULT_CONSTANT = 1.0
     DEFAULT_OPTIMIZED = False
+    DEFAULT_CORRIDOR = -1
+    DEFAULT_CORRIDOR_FEATURE = -1
 
     def __init__(self, discount_factor: float = DEFAULT_DISCOUNT_FACTOR,
                  init_weight: float = DEFAULT_INIT_WEIGHT,
                  delta: float = DEFAULT_DELTA,
                  epsilon: float = DEFAULT_EPSILON,
                  optimized: bool = DEFAULT_OPTIMIZED,
-                 constant: float = DEFAULT_CONSTANT):
+                 constant: float = DEFAULT_CONSTANT,
+                 corridor: int = DEFAULT_CORRIDOR,
+                 corridor_feature: int = DEFAULT_CORRIDOR_FEATURE):
         self.discount_factor = discount_factor
         self.init_weight = init_weight
         self.delta = delta
         self.epsilon = epsilon
         self.optimized = optimized
         self.constant = constant
+        self.corridor = corridor
+        self.corridor_feature = corridor_feature
 
     def get_name(self, base_name):
         discount = "-lambda{}".format(self.discount_factor) if self.discount_factor != ADPSettings.DEFAULT_DISCOUNT_FACTOR else ""
@@ -53,8 +59,10 @@ class ADPSettings:
         delta = "-d{}".format(self.delta) if self.delta != ADPSettings.DEFAULT_DELTA else ""
         epsilon = "-eps{}".format(self.epsilon) if self.epsilon != ADPSettings.DEFAULT_EPSILON else ""
         const = "-c{}".format(self.constant) if self.constant != ADPSettings.DEFAULT_CONSTANT else ""
+        cor = "-cm{}".format(self.corridor) if self.corridor != ADPSettings.DEFAULT_CORRIDOR else ""
+        corf = "-cmf{}".format(self.corridor_feature) if self.corridor_feature != ADPSettings.DEFAULT_CORRIDOR_FEATURE else ""
         opt = "-optimized" if self.optimized != ADPSettings.DEFAULT_OPTIMIZED else ""
-        return "{}{}{}{}{}{}{}".format(base_name, discount, weight, delta, epsilon, const, opt)
+        return "{}{}{}{}{}{}{}{}{}".format(base_name, discount, weight, delta, epsilon, const, cor, corf, opt)
 
 available_algorithms = [
     "SingleFixed",
@@ -140,6 +148,16 @@ def init_terminal(terminal_type):
         return Terminal.empty_bay(200, 4)
     elif terminal_type == '6':
         return Terminal.empty_bay(20, 4)
+    elif terminal_type == '7':
+        return Terminal.empty_single_stack_block(15, 4)
+    elif terminal_type == '8':
+        # blocks = [Block((Stack(()), Stack(()), Stack(()), Stack(()), Stack(())), True, 0) for i in range(48)]
+        blocks = [Block((Stack(()), Stack(()), Stack(()), Stack(()), Stack(())), True, 0) for i in range(18)]
+        des_blocks = [
+            Block((Stack(()), Stack(()), Stack(()), Stack(()), Stack(())), True, 1),
+            Block((Stack(()), Stack(()), Stack(()), Stack(()), Stack(())), True, 1)
+        ]
+        return Terminal(tuple(blocks+des_blocks), 4)
     else:
         raise RuntimeError("Invalid Terminal type {} supplied".format(terminal_type))
 
@@ -153,8 +171,10 @@ def load_events(terminal_type):
         return [EvaluatableEvents.load_evaluatable_events("40_15_500_250_{}".format(i)) for i in range(1, 17)]
     elif terminal_type == '5':
         return [EvaluatableEvents.load_evaluatable_events("40_15_1000_250_{}".format(i)) for i in range(1, 17)]
-    elif terminal_type == '6':
+    elif terminal_type in ['6', '7']:
         return [EvaluatableEvents.load_evaluatable_events("40_15_100_250_{}".format(i)) for i in range(1, 17)]
+    elif terminal_type in ['8']:
+        return [EvaluatableEvents.load_evaluatable_events("40_15_100_250_{}-10".format(i)) for i in range(1, 17)]
 
 
 def evaluate_adp(args) -> Tuple[List[float], List[float]]:
@@ -165,6 +185,7 @@ def evaluate_adp(args) -> Tuple[List[float], List[float]]:
     :return:
     """
     alg_name, event, instance_nr, terminal_type, number_sample_iterations, evaluation_samples, every_th_iteration, use_optimized, adp_settings = args
+    container_labels = event.container_labels
     print("{}:{} has been started".format(alg_name, instance_nr))
     initial_terminal = init_terminal(terminal_type)
     file_writer = FileWriter(alg_name, instance_nr, terminal_type, adp_settings)
@@ -204,12 +225,15 @@ def evaluate_adp(args) -> Tuple[List[float], List[float]]:
         features[-1] = constant_variable(adp_settings.constant)
 
         # noinspection PyUnboundLocalVariable
-        value_function_approx = BasisFunction(features, adp_settings.init_weight, delta=adp_settings.delta, file_writer=file_writer)
-        # value_function_approx = BasisFunction(features, 0.0, delta=0.9, file_writer=file_writer)
+        value_function_approx = BasisFunction(features, adp_settings.init_weight, container_labels, delta=adp_settings.delta, file_writer=file_writer)
 
     # noinspection PyUnboundLocalVariable
-    adp = ADP(event, initial_terminal, single, epsilon, value_function_approx, number_sample_iterations,
-              discount_factor, True, every_th_iteration, evaluation_samples, problem_instance=instance_nr, use_optimized_outcomes=use_optimized)
+    # container_dict = {1: 0, 2: 1} # key is container id, value is label. Label 0 means container may be placed
+    # everywhere, other numbers need to match
+
+    adp = ADP(event, initial_terminal, single, epsilon, value_function_approx, container_labels, number_sample_iterations,
+              discount_factor, True, every_th_iteration, evaluation_samples, problem_instance=instance_nr,
+              use_optimized_outcomes=use_optimized, corridor_size=adp_settings.corridor, corridor_feature=adp_settings.corridor_feature)
 
     iterations, reshuffles, init_values = extract_results(adp)
 
@@ -234,7 +258,6 @@ def extract_results(adp: ADP):
 
 
 def convert_result(results, iterations):
-    # print(results)
     avg_reshuffles = numpy.mean([tup[0] for tup in results], axis=0)
     avg_init_values = numpy.mean([tup[1] for tup in results], axis=0)
 
@@ -247,12 +270,10 @@ def convert_result(results, iterations):
 
 
 def main(alg_name: str, terminal_type: str, number_sample_iterations: int, evaluation_samples: int, every_th_iteration: int, use_optimized: bool, adp_settings: ADPSettings):
-    # events = [EvaluatableEvents.load_evaluatable_events("20_12_30_250_{}".format(i)) for i in range(1, 17)]
     events = load_events(terminal_type)
 
     with Pool(number_cores) as pool:
         job_args = [[alg_name, events[i], i+1, terminal_type, number_sample_iterations, evaluation_samples, every_th_iteration, use_optimized, adp_settings] for i in range(len(events))]
-        # job_args = [[alg_name, events[i], i+1, terminal_type, number_sample_iterations, evaluation_samples, every_th_iteration] for i in [0, 1]]
 
         result = pool.map(evaluate_adp, job_args)
 
@@ -277,7 +298,7 @@ if __name__ == '__main__':
     parser.add_argument('-i', default=10, help="Every ith iteration an evaluation is run")
     parser.add_argument('-c', '--cores', required=True, help="The size of the pool used. To maximize performance, give value equal to number of available cores", action="store")
     parser.add_argument('-a', '--algorithm', required=True, help="The algorithm that needs to be run", choices=available_algorithms)
-    parser.add_argument('-t', '--terminal', required=True, action="store", help="Which terminal layout needs to be used. 1=gantry, 2=reachstacker", choices=['1','2','3','4','5','6'])
+    parser.add_argument('-t', '--terminal', required=True, action="store", help="Which terminal layout needs to be used. 1=gantry, 2=reachstacker", choices=['1','2','3','4','5','6','7', '8'])
     parser.add_argument('-o', '--optimized', default=False, action="store_true", help="Whether optimized outcomes needs to be used")
 
 
@@ -286,6 +307,8 @@ if __name__ == '__main__':
     parser.add_argument('-weight', default=ADPSettings.DEFAULT_INIT_WEIGHT)
     parser.add_argument('-epsilon', default=ADPSettings.DEFAULT_EPSILON)
     parser.add_argument('-constant', default=ADPSettings.DEFAULT_CONSTANT)
+    parser.add_argument('-corridor', default=ADPSettings.DEFAULT_CORRIDOR)
+    parser.add_argument('-corridorf', default=ADPSettings.DEFAULT_CORRIDOR_FEATURE)
 
 
 
@@ -298,6 +321,8 @@ if __name__ == '__main__':
     evaluation_samples = int(args.e)
     every_th_iteration = int(args.i)
     optimized = args.optimized
+    corridor = int(args.corridor)
+    corridor_feature = int(args.corridorf)
 
     discount_factor = float(args.discount)
     init_weight = float(args.weight)
@@ -314,7 +339,9 @@ if __name__ == '__main__':
         init_weight=init_weight,
         delta=delta,
         epsilon=epsilon,
-        constant=constant
+        constant=constant,
+        corridor=corridor,
+        corridor_feature=corridor_feature
     )
 
     main(alg_name, terminal_type, N, evaluation_samples, every_th_iteration, optimized, adp_settings)

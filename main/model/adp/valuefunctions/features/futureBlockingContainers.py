@@ -1,5 +1,6 @@
-from typing import List
+from typing import List, Optional
 
+from main.model.adp.valuefunctions.features.util.getBlocks import get_blocks
 from main.model.batch import RealizedBatch
 from main.model.dataclass import Container
 from main.model.dataclass.block import Block
@@ -9,8 +10,9 @@ from main.model.events.events import Events
 from main.model.events.realizedEvents import RealizedEvents
 
 
-def future_blocking_containers(terminal: Terminal, event: Events, current_batch_number: int):
-    stacks = [stack for block in terminal.blocks for stack in block.stacks if stack.height()>0]
+def future_blocking_containers(terminal: Terminal, event: Events, current_batch_number: int, corridor: Optional[List[int]], container_labels: dict):
+    blocks = get_blocks(terminal, corridor)
+    stacks = [stack for block in blocks for stack in block.stacks if stack.height()>0]
     inbound_batches = [(t, event.batch(t).containers) for t in range(len(event.batches)) if
                        t > current_batch_number and event.batch(t).inbound]
     total = 0

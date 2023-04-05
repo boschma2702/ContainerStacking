@@ -1,17 +1,20 @@
 from statistics import mean
+from typing import Optional, List
 
+from main.model.adp.valuefunctions.features.util.getBlocks import get_blocks
 from main.model.dataclass.terminal import Terminal
 from main.model.events.events import Events
 
 
-def average_stack_height(terminal: Terminal, event: Events, current_batch_number: int) -> float:
+def average_stack_height(terminal: Terminal, event: Events, current_batch_number: int, corridor: Optional[List[int]], container_labels: dict) -> float:
     """
     Calculates the average stack height of non empty stacks
     :param terminal:
     :return:
     """
+    blocks = get_blocks(terminal, corridor)
     l = [
-        stack.height() for block in terminal.blocks for stack in block.stacks if stack.height() > 0
+        stack.height() for block in blocks for stack in block.stacks if stack.height() > 0
     ]
     if len(l) == 0:
         return 0

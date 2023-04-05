@@ -10,10 +10,10 @@ from main.model.events.events import Events
 
 class BasisFunction(ValueFunctionApproximate):
 
-    def value_approximate(self, n: int, t: int, terminal: Terminal, event: Events) -> float:
+    def value_approximate(self, n: int, t: int, terminal: Terminal, event: Events, corridor: Optional[List[int]] = None) -> float:
         # weights = self.weights[n].get(t, self.init_weights)
         weights = self.get_last_known(self.weights, self.init_weights, n, t)
-        result = numpy.sum(weights.T * self.feature_evaluation(terminal, event, t))
+        result = numpy.sum(weights.T * self.feature_evaluation(terminal, event, t, corridor))
         return result
 
     def on_iteration_done(self, iteration_number: int):
@@ -37,7 +37,7 @@ class BasisFunction(ValueFunctionApproximate):
         error = value_estimate - observed_value
 
         # convert to correct size (numpy qwerks)
-        feature_evaluation = self.feature_evaluation(previous_terminal, event, t)
+        feature_evaluation = self.feature_evaluation(previous_terminal, event, t, None)
         feature_evaluation = numpy.atleast_2d(feature_evaluation).T
 
         # previous_weights = self.weights[n - 1].get(t, self.get_last_known_weight(n-1, t))
@@ -56,21 +56,24 @@ class BasisFunction(ValueFunctionApproximate):
         B_n = (1 / self.alpha(n)) * (previous_B_n - (1 / gamma_n) * matrix_mul)
         self.B[n][t] = B_n
 
-    def feature_evaluation(self, state, event: Events, t: int):
+    def feature_evaluation(self, state, event: Events, t: int, corridor: Optional[List[int]]):
         # Calculates \phi
-        return numpy.array([f(state, event, t) for f in self.feature_functions])
+        return numpy.array([f(state, event, t, corridor, self.container_labels) for f in self.feature_functions])
 
     def alpha(self, n) -> float:
         # calculate \alpha_n
         return 1 - (self.delta / n)
 
-    def __init__(self, feature_functions: List[Callable[[Terminal, Events, int], float]], init_weight, epsilon=0.1, delta=0.5, file_writer: Optional[FileWriter] = None):
+    def __init__(self, feature_functions: List[Callable[[Terminal, Events, int, Optional[List[int]], dict], float]],
+                 init_weight, container_labels, epsilon=0.1, delta=0.5, file_writer: Optional[FileWriter] = None):
         self.file_writer = file_writer
         # small constant to initialize Bn. This initialization works well when the number of observations is large
         self.epsilon = epsilon
         # constant used to determine alpha^n. The value of alpha determines the weight on prior observations (lower
         # alpha means lower weight).
         self.delta = delta
+
+        self.container_labels = container_labels
 
         # using dicts
         self.feature_functions = feature_functions

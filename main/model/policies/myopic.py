@@ -12,16 +12,16 @@ from main.model.util.prioritizedItem import PrioritizedItem
 
 class Myopic(Policy):
 
-    def handle_realized_inbound_batch(self, terminal: Terminal, realized_batch: RealizedBatch, batch_number: int) \
+    def handle_realized_inbound_batch(self, terminal: Terminal, realized_batch: RealizedBatch, batch_number: int, container_labels: dict) \
             -> Tuple[Terminal, int]:
-        return lowest_inbound_outcome(terminal, realized_batch)
+        return lowest_inbound_outcome(terminal, realized_batch, container_labels)
 
-    def handle_realized_outbound_batch(self, terminal: Terminal, realized_batch: RealizedBatch, batch_number: int) \
+    def handle_realized_outbound_batch(self, terminal: Terminal, realized_batch: RealizedBatch, batch_number: int, container_labels: dict) \
             -> Tuple[Terminal, int]:
-        return lowest_outbound_outcome(terminal, realized_batch)
+        return lowest_outbound_outcome(terminal, realized_batch, container_labels)
 
 
-def lowest_inbound_outcome(initial_terminal: Terminal, batch: RealizedBatch) -> Tuple[Terminal, int]:
+def lowest_inbound_outcome(initial_terminal: Terminal, batch: RealizedBatch, container_labels: dict) -> Tuple[Terminal, int]:
     # q = ((reshuffles, -i)), term)
     q = PriorityQueue()
     q.put(PrioritizedItem((0, 0), initial_terminal))
@@ -39,7 +39,7 @@ def lowest_inbound_outcome(initial_terminal: Terminal, batch: RealizedBatch) -> 
         else:
             # not yet finished
             current_container = batch.containers[i]
-            store_outcomes = store_locations(terminal, current_container, None)
+            store_outcomes = store_locations(terminal, current_container, None, -1, container_labels)
             for new_term in store_outcomes:
                 new_term_abstracted = new_term.abstract()
                 if new_term_abstracted not in abstract_added:
@@ -50,7 +50,7 @@ def lowest_inbound_outcome(initial_terminal: Terminal, batch: RealizedBatch) -> 
     raise NoSolutionError("Could not find suitable solutions for batch: {}\n terminal:\n{}".format(batch, initial_terminal))
 
 
-def lowest_outbound_outcome(initial_terminal: Terminal, batch: RealizedBatch) -> Tuple[Terminal, int]:
+def lowest_outbound_outcome(initial_terminal: Terminal, batch: RealizedBatch, container_labels) -> Tuple[Terminal, int]:
     # q = ((reshuffles, -i)), term)
     q = PriorityQueue()
     q.put(PrioritizedItem((0, 0), initial_terminal))
@@ -69,7 +69,7 @@ def lowest_outbound_outcome(initial_terminal: Terminal, batch: RealizedBatch) ->
             # not yet explored, need to add children to queue
             current_container = batch.containers[i]
             # store_outcomes = __store_locations(terminal, current_container, None)
-            handling_outcomes, is_reshuffle = handle_outbound_container(terminal, current_container)
+            handling_outcomes, is_reshuffle = handle_outbound_container(terminal, current_container, -1, container_labels)
             new_i = i + int(not is_reshuffle)
             new_reshuffles = reshuffles + int(is_reshuffle)
             for new_term in handling_outcomes:

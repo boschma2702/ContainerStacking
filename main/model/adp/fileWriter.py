@@ -39,4 +39,3 @@ class FileWriter:
 
     def write_to_instance_folder(self, file: str, contents: str):
         self.__write(self.instance_folder_path, "t{}-{}".format(self.terminal_type, file), contents)
-

@@ -1,5 +1,6 @@
-from typing import Tuple
+from typing import Tuple, Optional, List
 
+from main.model.adp.valuefunctions.features.util.getBlocks import get_blocks
 from main.model.dataclass import Container
 from main.model.dataclass.block import Block
 from main.model.dataclass.stack import Stack
@@ -7,9 +8,10 @@ from main.model.dataclass.terminal import Terminal
 from main.model.events.events import Events
 
 
-def future_blocking_stacks(terminal: Terminal, event: Events, current_batch_number: int):
+def future_blocking_stacks(terminal: Terminal, event: Events, current_batch_number: int, corridor: Optional[List[int]], container_labels: dict):
+    blocks = get_blocks(terminal, corridor)
     result = 0
-    stacks = [stack for block in terminal.blocks for stack in block.stacks]
+    stacks = [stack for block in blocks for stack in block.stacks]
     inbound_batches = [(t, event.batch(t).containers) for t in range(len(event.batches)) if t > current_batch_number and event.batch(t).inbound]
     for stack in stacks:
         if stack_is_blocking_in_future(stack, inbound_batches):

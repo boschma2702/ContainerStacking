@@ -13,23 +13,24 @@ class Policy:
 
     nr_samples = 1000
 
-    def __init__(self, events: Events, initial_terminal: Terminal):
+    def __init__(self, events: Events, initial_terminal: Terminal, container_labels: dict):
         self.events = events
         self.initial_terminal = initial_terminal
+        self.container_labels = container_labels
 
     def handle_realized_batch(self, terminal: Terminal, realized_batch: RealizedBatch, batch_number: int) \
             -> Tuple[Terminal, int]:
         if realized_batch.inbound:
-            return self.handle_realized_inbound_batch(terminal, realized_batch, batch_number)
+            return self.handle_realized_inbound_batch(terminal, realized_batch, batch_number, self.container_labels)
         else:
             t = terminal.reveal_order(realized_batch.containers)
-            return self.handle_realized_outbound_batch(t, realized_batch, batch_number)
+            return self.handle_realized_outbound_batch(t, realized_batch, batch_number, self.container_labels)
 
-    def handle_realized_inbound_batch(self, terminal: Terminal, realized_batch: RealizedBatch, batch_number: int)\
+    def handle_realized_inbound_batch(self, terminal: Terminal, realized_batch: RealizedBatch, batch_number: int, container_labels: dict)\
             -> Tuple[Terminal, int]:
         raise NotImplementedError('Should be implemented by policy')
 
-    def handle_realized_outbound_batch(self, terminal: Terminal, realized_batch: RealizedBatch, batch_number: int)\
+    def handle_realized_outbound_batch(self, terminal: Terminal, realized_batch: RealizedBatch, batch_number: int, container_labels: dict)\
             -> Tuple[Terminal, int]:
         raise NotImplementedError('Should be implemented by policy')
 

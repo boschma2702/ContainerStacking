@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, Optional, List
 
 from main.model.adp.stepsize import StepSize
 from main.model.adp.valuefunctions.valueFunctionApproximation import ValueFunctionApproximate
@@ -16,7 +16,7 @@ class AbstractState(ValueFunctionApproximate):
         self.approx_values = {}
         self.iteration_values = {}
 
-    def value_approximate(self, iteration_number: int, t: int, terminal: Terminal, event: Events) -> float:
+    def value_approximate(self, iteration_number: int, t: int, terminal: Terminal, event: Events, corridor: Optional[List[int]]=None) -> float:
         return self.approx_values.get((t, terminal.abstract()), self.initial_estimator(terminal, event, t))
 
     def on_iteration_done(self, iteration_number: int):

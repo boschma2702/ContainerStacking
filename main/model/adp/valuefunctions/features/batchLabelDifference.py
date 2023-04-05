@@ -1,11 +1,15 @@
+from typing import Optional, List
+
+from main.model.adp.valuefunctions.features.util.getBlocks import get_blocks
 from main.model.dataclass.block import Block
 from main.model.dataclass.stack import Stack
 from main.model.dataclass.terminal import Terminal
 from main.model.events.events import Events
 
 
-def batch_label_difference(terminal: Terminal, event: Events, current_batch_number: int) -> float:
-    return sum([block_batch_label_diff(block) for block in terminal.blocks])
+def batch_label_difference(terminal: Terminal, event: Events, current_batch_number: int, corridor: Optional[List[int]], container_labels: dict) -> float:
+    blocks = get_blocks(terminal, corridor)
+    return sum([block_batch_label_diff(block) for block in blocks])
 
 
 def block_batch_label_diff(block: Block) -> float:

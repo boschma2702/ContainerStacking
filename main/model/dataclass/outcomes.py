@@ -1,6 +1,8 @@
 import math
 from queue import PriorityQueue
-from typing import Tuple, Set, Optional
+import random
+from typing import Tuple, Set, Optional, List
+import bisect
 
 from main.model.dataclass import Container, StackLocation, StackTierLocation
 
@@ -11,18 +13,19 @@ from main.model.noSolutionError import NoSolutionError
 from main.model.util.prioritizedItem import PrioritizedItem
 
 
-def terminal_unique_outcomes(terminal: Terminal, batch: RealizedBatch) -> Set[Tuple[Terminal, int]]:
+def terminal_unique_outcomes(terminal: Terminal, batch: RealizedBatch, corridor_size: int, container_labels: dict) \
+        -> Set[Tuple[Terminal, int]]:
     if batch.length() == 0:
         return {(terminal, 0)}
     if batch.inbound:
-        return _unique_inbound_outcomes(terminal, batch)
+        return _unique_inbound_outcomes(terminal, batch, corridor_size, container_labels)
     else:
         t = terminal.reveal_order(batch.containers)
-        return _unique_outbound_outcomes(t, batch)
+        return _unique_outbound_outcomes(t, batch, corridor_size, container_labels)
 
 
-def _unique_inbound_outcomes(initial_terminal: Terminal, batch: RealizedBatch) -> Set[Tuple[Terminal, int]]:
-    # q = ((-i, reshuffles)), term)
+def _unique_inbound_outcomes(initial_terminal: Terminal, batch: RealizedBatch, corridor_size, container_labels: dict) \
+        -> Set[Tuple[Terminal, int]]:
     q = PriorityQueue()
     q.put(PrioritizedItem((0, 0), initial_terminal))
     abstract_added = set()
@@ -39,23 +42,20 @@ def _unique_inbound_outcomes(initial_terminal: Terminal, batch: RealizedBatch) -
         else:
             # not yet explored, need to add children to queue
             current_container = batch.containers[i]
-            store_outcomes = store_locations(terminal, current_container, None)
+            store_outcomes = store_locations(terminal, current_container, None, corridor_size, container_labels)
             for new_term in store_outcomes:
-
                 new_term_abstracted = new_term.abstract()
                 if new_term_abstracted not in abstract_added:
                     new_i = i + 1
                     abstract_added.add(new_term_abstracted)
                     q.put(PrioritizedItem((-new_i, reshuffles), new_term))
     if len(result) == 0:
-        raise NoSolutionError("Could not find suitable solutions for batch: {}\n terminal:\n{}"
-                         .format(batch, initial_terminal))
+        raise NoSolutionError("Could not find suitable solutions for batch: {}\n terminal:\n{}".format(batch, initial_terminal))
     return result
 
 
-def _unique_outbound_outcomes(initial_terminal: Terminal, batch: RealizedBatch) \
-        -> Set[Tuple[Terminal, int]]:
-    # q = ((-i, reshuffles)), term)
+def _unique_outbound_outcomes(initial_terminal: Terminal, batch: RealizedBatch, corridor_size: int,
+                              container_labels: dict) -> Set[Tuple[Terminal, int]]:
     q = PriorityQueue()
     q.put(PrioritizedItem((0, 0), initial_terminal))
     abstract_added = set()
@@ -78,8 +78,7 @@ def _unique_outbound_outcomes(initial_terminal: Terminal, batch: RealizedBatch) 
         else:
             # not yet explored, need to add children to queue
             current_container = batch.containers[i]
-            # store_outcomes = __store_locations(terminal, current_container, None)
-            handling_outcomes, is_reshuffle = handle_outbound_container(terminal, current_container)
+            handling_outcomes, is_reshuffle = handle_outbound_container(terminal, current_container, corridor_size, container_labels)
             new_i = i + int(not is_reshuffle)
             new_reshuffles = reshuffles + int(is_reshuffle)
             for new_term in handling_outcomes:
@@ -93,14 +92,15 @@ def _unique_outbound_outcomes(initial_terminal: Terminal, batch: RealizedBatch) 
     return result
 
 
-def handle_outbound_container(terminal: Terminal, container: Container) -> Tuple[Set[Terminal], bool]:
+def handle_outbound_container(terminal: Terminal, container: Container, corridor_size: int, container_labels: dict) \
+        -> Tuple[Set[Terminal], bool]:
     current_stack_tier_location = terminal.container_location(container)
     blocking_containers = terminal.blocking_containers(current_stack_tier_location)
 
     if len(blocking_containers) > 0:
         blocking_container_location = terminal.container_location(blocking_containers[0])
         term, blocking_container = terminal.retrieve_container(blocking_container_location[:2])
-        reshuffle_outcomes = store_locations(term, blocking_container, current_stack_tier_location)
+        reshuffle_outcomes = store_locations(term, blocking_container, current_stack_tier_location, corridor_size, container_labels)
         return reshuffle_outcomes, True
     else:
         new_terminal, retrieved_container = terminal.retrieve_container(current_stack_tier_location[:-1])
@@ -108,27 +108,58 @@ def handle_outbound_container(terminal: Terminal, container: Container) -> Tuple
 
 
 def store_locations(terminal: Terminal, container: Container,
-                    exclude_target_stack_tier_location: Optional[StackTierLocation]) \
-        -> Set[Terminal]:
-    # max_stack_height = terminal.max_height
+                    exclude_target_stack_tier_location: Optional[StackTierLocation], corridor_size: int,
+                    container_labels: dict) -> Set[Terminal]:
     result = set()
     blocks_visited = set()
-
-    for block_index in range(terminal.nr_blocks()):
+    for block_index in corridor(terminal, exclude_target_stack_tier_location, corridor_size, container_labels[container[0]]):
         block = terminal.blocks[block_index]
         if block not in blocks_visited:
             blocks_visited.add(block)
-            for stack_index in range(len(block.stacks)):
-                stack_location = (block_index, stack_index)
-                # check if container may be placed in this location
-                if valid_store_location(terminal, stack_location, exclude_target_stack_tier_location):
-                    new_term = terminal.store_container((block_index, stack_index), container)
-                    result.add(new_term)
+            if container_allowed_in_block(block, container_labels[container[0]]):
+                for stack_index in range(len(block.stacks)):
+                    stack_location = (block_index, stack_index)
+                    # check if container may be placed in this location
+                    if valid_store_location(terminal, stack_location, exclude_target_stack_tier_location):
+                        new_term = terminal.store_container((block_index, stack_index), container)
+                        result.add(new_term)
 
     return result
 
 
+def container_allowed_in_block(block, container_label):
+    return container_label == 0 or container_label == block.designated
 
+
+def corridor(terminal: Terminal, exclude_target_stack_tier_location: Optional[StackTierLocation], corridor_size: int,
+             container_label: int) -> List[int]:
+    # if label = 0, then all places are available, otherwise limit to block equal to label
+    if container_label == 0:
+        block_indici = [i for i in range(0, terminal.nr_blocks())]
+    else:
+        block_indici = [i for i in range(0, terminal.nr_blocks()) if terminal.block(i).designated == container_label]
+
+    # check if corridor spans all blocks or no corridor is supplied
+    if corridor_size == -1 or corridor_size*2 + 1 >= len(block_indici):
+        return block_indici
+
+    bay_index = exclude_target_stack_tier_location[0] if exclude_target_stack_tier_location else random.randint(0, len(block_indici)-1)
+
+    # corridor contains at least the 'starting point'
+    corridor = [bay_index]
+
+    if bay_index not in block_indici: bisect.insort(block_indici, bay_index)
+
+    # add corridor_size indici smaller in block_indici to corridor
+    bay_index_index = bisect.bisect(block_indici, bay_index) - 1
+
+    for i in range(1, corridor_size+1):
+        up = (bay_index_index + i) % len(block_indici)
+        down = (bay_index_index - i) % len(block_indici)
+        corridor.append(block_indici[up])
+        corridor.append(block_indici[down])
+
+    return corridor
 
 
 def valid_store_location(terminal: Terminal,
