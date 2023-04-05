@@ -93,5 +93,5 @@ class Block:
         return hash((self.two_way, self.stacks))
 
     def __repr__(self):
-        return "\n".join([str(stack) for stack in self.stacks])
+        return str(self.designated)+"\n"+"\n".join([str(stack) for stack in self.stacks])
 

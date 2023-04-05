@@ -150,6 +150,14 @@ def init_terminal(terminal_type):
         return Terminal.empty_bay(20, 4)
     elif terminal_type == '7':
         return Terminal.empty_single_stack_block(15, 4)
+    elif terminal_type == '8':
+        # blocks = [Block((Stack(()), Stack(()), Stack(()), Stack(()), Stack(())), True, 0) for i in range(48)]
+        blocks = [Block((Stack(()), Stack(()), Stack(()), Stack(()), Stack(())), True, 0) for i in range(18)]
+        des_blocks = [
+            Block((Stack(()), Stack(()), Stack(()), Stack(()), Stack(())), True, 1),
+            Block((Stack(()), Stack(()), Stack(()), Stack(()), Stack(())), True, 1)
+        ]
+        return Terminal(tuple(blocks+des_blocks), 4)
     else:
         raise RuntimeError("Invalid Terminal type {} supplied".format(terminal_type))
 
@@ -165,6 +173,8 @@ def load_events(terminal_type):
         return [EvaluatableEvents.load_evaluatable_events("40_15_1000_250_{}".format(i)) for i in range(1, 17)]
     elif terminal_type in ['6', '7']:
         return [EvaluatableEvents.load_evaluatable_events("40_15_100_250_{}".format(i)) for i in range(1, 17)]
+    elif terminal_type in ['8']:
+        return [EvaluatableEvents.load_evaluatable_events("40_15_100_250_{}-10".format(i)) for i in range(1, 17)]
 
 
 def evaluate_adp(args) -> Tuple[List[float], List[float]]:
@@ -175,6 +185,7 @@ def evaluate_adp(args) -> Tuple[List[float], List[float]]:
     :return:
     """
     alg_name, event, instance_nr, terminal_type, number_sample_iterations, evaluation_samples, every_th_iteration, use_optimized, adp_settings = args
+    container_labels = event.container_labels
     print("{}:{} has been started".format(alg_name, instance_nr))
     initial_terminal = init_terminal(terminal_type)
     file_writer = FileWriter(alg_name, instance_nr, terminal_type, adp_settings)
@@ -214,12 +225,13 @@ def evaluate_adp(args) -> Tuple[List[float], List[float]]:
         features[-1] = constant_variable(adp_settings.constant)
 
         # noinspection PyUnboundLocalVariable
-        value_function_approx = BasisFunction(features, adp_settings.init_weight, delta=adp_settings.delta, file_writer=file_writer)
+        value_function_approx = BasisFunction(features, adp_settings.init_weight, container_labels, delta=adp_settings.delta, file_writer=file_writer)
 
     # noinspection PyUnboundLocalVariable
     # container_dict = {1: 0, 2: 1} # key is container id, value is label. Label 0 means container may be placed
     # everywhere, other numbers need to match
-    adp = ADP(event, initial_terminal, single, epsilon, value_function_approx, {}, number_sample_iterations,
+
+    adp = ADP(event, initial_terminal, single, epsilon, value_function_approx, container_labels, number_sample_iterations,
               discount_factor, True, every_th_iteration, evaluation_samples, problem_instance=instance_nr,
               use_optimized_outcomes=use_optimized, corridor_size=adp_settings.corridor, corridor_feature=adp_settings.corridor_feature)
 
@@ -286,7 +298,7 @@ if __name__ == '__main__':
     parser.add_argument('-i', default=10, help="Every ith iteration an evaluation is run")
     parser.add_argument('-c', '--cores', required=True, help="The size of the pool used. To maximize performance, give value equal to number of available cores", action="store")
     parser.add_argument('-a', '--algorithm', required=True, help="The algorithm that needs to be run", choices=available_algorithms)
-    parser.add_argument('-t', '--terminal', required=True, action="store", help="Which terminal layout needs to be used. 1=gantry, 2=reachstacker", choices=['1','2','3','4','5','6', '7'])
+    parser.add_argument('-t', '--terminal', required=True, action="store", help="Which terminal layout needs to be used. 1=gantry, 2=reachstacker", choices=['1','2','3','4','5','6','7', '8'])
     parser.add_argument('-o', '--optimized', default=False, action="store_true", help="Whether optimized outcomes needs to be used")
 
 

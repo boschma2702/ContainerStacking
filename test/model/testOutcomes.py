@@ -41,6 +41,7 @@ class TestOutcomes(unittest.TestCase):
         ), 4
     )
     t3 = Terminal((Block(t2.blocks[0].stacks, True),), 4)
+    t_block = Terminal.empty_bay(1, 4)
 
     def test_valid_store_height(self):
         self.assertEqual(valid_store_location(self.t, (0, 0), None), False)
@@ -127,6 +128,12 @@ class TestOutcomes(unittest.TestCase):
 
         self.assertTrue(valid_store_location(t, (0,2), None))
 
+    def test_empty_bay(self):
+        self.assertFalse(valid_store_location(self.t_block, (0,0), None))
+        self.assertFalse(valid_store_location(self.t_block, (0,1), None))
+        self.assertTrue(valid_store_location(self.t_block, (0,2), None))
+        self.assertFalse(valid_store_location(self.t_block, (0,3), None))
+        self.assertFalse(valid_store_location(self.t_block, (0,4), None))
 
 
 

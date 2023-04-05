@@ -91,7 +91,7 @@ def _optimized_outbound_outcome(initial_terminal: Terminal,
                                                                        container_labels)
                 else:
                     # Reshuffle to random locations
-                    valid_locations = valid_store_locations(current_terminal, target_location, corridor_size)
+                    valid_locations = valid_store_locations(current_terminal, target_location, corridor_size, blocking_container, container_labels)
                     stack_location = random.choice(valid_locations)
                     current_terminal = term.store_container(stack_location, blocking_container)
 
@@ -115,13 +115,14 @@ def optimized_store_location(terminal: Terminal,
                              ) -> Tuple[Terminal, float]:
     min_value = math.inf
     min_terminal = None
-    corridor_list = corridor(terminal, exclude_target_stack_tier_location, corridor_size)
+    container_label = container_labels[container[0]]
+    corridor_list = corridor(terminal, exclude_target_stack_tier_location, corridor_size, container_label)
 
     # determine corridor for feature
     if corridor_size == corridor_size_feature:
         corridor_list_feature = corridor_list
     else:
-        corridor_list_feature = corridor(terminal, exclude_target_stack_tier_location, corridor_size_feature)
+        corridor_list_feature = corridor(terminal, exclude_target_stack_tier_location, corridor_size_feature, container_label)
 
     for block_index in corridor_list:
         block = terminal.blocks[block_index]
@@ -146,7 +147,7 @@ def valid_store_locations(terminal: Terminal, exclude_target_stack_tier_location
                           corridor_size: int, container_to_store: Tuple[int, int, int], container_labels: dict) \
         -> List[StackLocation]:
     valid_locations = []
-    for block_index in corridor(terminal, exclude_target_stack_tier_location, corridor_size):
+    for block_index in corridor(terminal, exclude_target_stack_tier_location, corridor_size, container_labels[container_to_store[0]]):
         block = terminal.blocks[block_index]
         if container_allowed_in_block(block, container_labels[container_to_store[0]]):
             for stack_index in range(len(block.stacks)):

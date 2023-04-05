@@ -11,18 +11,18 @@ from main.model.policies.policy import Policy
 
 class Heuristic(Policy):
 
-    def __init__(self, events: Events, initial_terminal: Terminal):
-        super().__init__(events, initial_terminal)
+    def __init__(self, events: Events, initial_terminal: Terminal, container_labels: dict):
+        super().__init__(events, initial_terminal, container_labels)
         self.cache = {}
 
-    def handle_realized_inbound_batch(self, terminal: Terminal, realized_batch: RealizedBatch, batch_number: int) \
+    def handle_realized_inbound_batch(self, terminal: Terminal, realized_batch: RealizedBatch, batch_number: int, container_labels: dict) \
             -> Tuple[Terminal, int]:
         new_terminal = terminal
         for container in realized_batch.containers:
-            new_terminal = self.handle_inbound_container(new_terminal, container)
+            new_terminal = self.handle_inbound_container(new_terminal, container, container_labels)
         return new_terminal, 0
 
-    def handle_realized_outbound_batch(self, initial_terminal: Terminal, realized_batch: RealizedBatch, batch_number: int) \
+    def handle_realized_outbound_batch(self, initial_terminal: Terminal, realized_batch: RealizedBatch, batch_number: int, container_labels: dict) \
             -> Tuple[Terminal, int]:
         terminal = initial_terminal
         reshuffles = 0
@@ -33,14 +33,14 @@ class Heuristic(Policy):
             # move blocking containers
             blocking_containers = terminal.blocking_containers((current_block, current_stack, current_tier))
             if len(blocking_containers) > 0:
-                terminal = self.handle_reshuffles(terminal, target_container, blocking_containers, stack_location)
+                terminal = self.handle_reshuffles(terminal, target_container, blocking_containers, stack_location, container_labels)
                 reshuffles += len(blocking_containers)
 
             terminal, container = terminal.retrieve_container(stack_location)
             assert container[0] == target_container[0]
         return terminal, reshuffles
 
-    def handle_inbound_container(self, terminal: Terminal, container: Container) -> Terminal:
+    def handle_inbound_container(self, terminal: Terminal, container: Container, container_labels: dict) -> Terminal:
         """
         Abstract method that handles an inbound container according to the defined heuristic.
         :param terminal: The terminal in which the given container needs to be placed
@@ -50,7 +50,7 @@ class Heuristic(Policy):
         raise NotImplementedError
 
     def handle_reshuffles(self, terminal: Terminal, target_container: Container,
-                          blocking_containers: Iterator[Container], stack_index: StackLocation) -> Terminal:
+                          blocking_containers: Iterator[Container], stack_index: StackLocation, container_labels: dict) -> Terminal:
         """
         Abstract method that handles reshuffles according to the defined heuristic.
         :param terminal: The terminal in which the reshuffles are taken place
@@ -84,9 +84,9 @@ class Heuristic(Policy):
                 terminal = initial_terminal.reveal_order(batch_realization).abstract()
 
             if current_batch.inbound:
-                new_terminal, costs = self.handle_realized_inbound_batch(terminal, batch_realization, t)
+                new_terminal, costs = self.handle_realized_inbound_batch(terminal, batch_realization, t, self.container_labels)
             else:
-                new_terminal, costs = self.handle_realized_outbound_batch(terminal, batch_realization, t)
+                new_terminal, costs = self.handle_realized_outbound_batch(terminal, batch_realization, t, self.container_labels)
 
             value = value + costs + self.__calculate(new_terminal, t + 1)
 

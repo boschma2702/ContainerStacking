@@ -7,7 +7,7 @@ from main.model.dataclass.terminal import Terminal
 from main.model.events.events import Events
 
 
-def batch_label_difference(terminal: Terminal, event: Events, current_batch_number: int, corridor: Optional[List[int]]) -> float:
+def batch_label_difference(terminal: Terminal, event: Events, current_batch_number: int, corridor: Optional[List[int]], container_labels: dict) -> float:
     blocks = get_blocks(terminal, corridor)
     return sum([block_batch_label_diff(block) for block in blocks])
 

@@ -10,7 +10,7 @@ from main.model.events.events import Events
 from main.model.events.realizedEvents import RealizedEvents
 
 
-def future_blocking_containers(terminal: Terminal, event: Events, current_batch_number: int, corridor: Optional[List[int]]):
+def future_blocking_containers(terminal: Terminal, event: Events, current_batch_number: int, corridor: Optional[List[int]], container_labels: dict):
     blocks = get_blocks(terminal, corridor)
     stacks = [stack for block in blocks for stack in block.stacks if stack.height()>0]
     inbound_batches = [(t, event.batch(t).containers) for t in range(len(event.batches)) if

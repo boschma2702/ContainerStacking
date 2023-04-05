@@ -8,7 +8,7 @@ from main.model.dataclass.terminal import Terminal
 from main.model.events.events import Events
 
 
-def non_reachable_containers(terminal: Terminal, event: Events, current_batch_number: int, corridor: Optional[List[int]]):
+def non_reachable_containers(terminal: Terminal, event: Events, current_batch_number: int, corridor: Optional[List[int]], container_labels: dict):
     total = 0
     for block in get_blocks(terminal, corridor):
         for stack_index in range(len(block.stacks)):

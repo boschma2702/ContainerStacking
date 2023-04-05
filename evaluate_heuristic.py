@@ -27,15 +27,15 @@ class heuristicSetting(ADPSettings):
 def evaluate_policy(args):
     alg_name, event, instance_nr, terminal_type, evaluation_samples = args
     initial_terminal = init_terminal(terminal_type)
-
+    container_labels = event.container_labels
     file_writer = FileWriter(alg_name, instance_nr, terminal_type, heuristicSetting())
 
     if alg_name == "MyOpic":
-        policy: Policy = Myopic(event, initial_terminal)
+        policy: Policy = Myopic(event, initial_terminal, container_labels)
     if alg_name == "MM":
-        policy: Policy = MMRule(event, initial_terminal)
+        policy: Policy = MMRule(event, initial_terminal, container_labels)
     if alg_name == "MMAdopted":
-        policy: Policy = MMAdoptedRule(event, initial_terminal)
+        policy: Policy = MMAdoptedRule(event, initial_terminal, container_labels)
 
     # noinspection PyUnboundLocalVariable
     mean, standard_dev = Policy.evaluate(policy, initial_terminal, event, evaluation_samples)
@@ -82,7 +82,7 @@ if __name__ == '__main__':
     parser.add_argument('-e', default=150, help="Number of evaluation samples run")
     parser.add_argument('-c', '--cores', required=True, help="The size of the pool used. To maximize performance, give value equal to number of available cores", action="store")
     parser.add_argument('-a', '--algorithm', required=True, help="The algorithm that needs to be run", choices=available_algorithms)
-    parser.add_argument('-t', '--terminal', required=True, action="store", help="Which terminal layout needs to be used. 1=gantry, 2=reachstacker", choices=['1','2','3','4','5','6','7'])
+    parser.add_argument('-t', '--terminal', required=True, action="store", help="Which terminal layout needs to be used. 1=gantry, 2=reachstacker", choices=['1','2','3','4','5','6','7','8'])
 
     args = parser.parse_args()
 

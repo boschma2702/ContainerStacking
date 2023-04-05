@@ -58,20 +58,22 @@ class BasisFunction(ValueFunctionApproximate):
 
     def feature_evaluation(self, state, event: Events, t: int, corridor: Optional[List[int]]):
         # Calculates \phi
-        return numpy.array([f(state, event, t, corridor) for f in self.feature_functions])
+        return numpy.array([f(state, event, t, corridor, self.container_labels) for f in self.feature_functions])
 
     def alpha(self, n) -> float:
         # calculate \alpha_n
         return 1 - (self.delta / n)
 
-    def __init__(self, feature_functions: List[Callable[[Terminal, Events, int, Optional[List[int]]], float]],
-                 init_weight, epsilon=0.1, delta=0.5, file_writer: Optional[FileWriter] = None):
+    def __init__(self, feature_functions: List[Callable[[Terminal, Events, int, Optional[List[int]], dict], float]],
+                 init_weight, container_labels, epsilon=0.1, delta=0.5, file_writer: Optional[FileWriter] = None):
         self.file_writer = file_writer
         # small constant to initialize Bn. This initialization works well when the number of observations is large
         self.epsilon = epsilon
         # constant used to determine alpha^n. The value of alpha determines the weight on prior observations (lower
         # alpha means lower weight).
         self.delta = delta
+
+        self.container_labels = container_labels
 
         # using dicts
         self.feature_functions = feature_functions

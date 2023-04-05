@@ -9,12 +9,17 @@ from main.model.dataclass.stack import Stack
 from main.model.dataclass.terminal import Terminal
 
 
-def MM_adopted_rule(terminal: Terminal, included_block_indices: List[int]) -> float:
-    return MM_rule(terminal, included_block_indices, MM_adopted_store_container)
+def MM_adopted_rule(terminal: Terminal, included_block_indices: List[int], container_labels: dict) -> float:
+    return MM_rule(terminal, included_block_indices, container_labels, MM_adopted_store_container)
 
 
-def MM_adopted_store_container(terminal: Terminal, container: Container, to_exclude: Optional[StackLocation], included_block_indices: List[int]) -> Terminal:
-    valid_stacks = get_valid_stacks(terminal, to_exclude, included_block_indices) #yields a stack that is not valid as it introduces a new blocking
+def MM_adopted_store_container(terminal: Terminal,
+                               container: Container,
+                               to_exclude: Optional[StackLocation],
+                               included_block_indices: List[int],
+                               container_labels: dict) -> Terminal:
+    container_label = container_labels.get(container[0])
+    valid_stacks = get_valid_stacks(terminal, to_exclude, included_block_indices, container_label) #yields a stack that is not valid as it introduces a new blocking
     # try to pick a stack that cause no new reshuffles, disregarding empty stacks
     no_reshuffle_stacks = [(stack[0].min_container(), stack[1]) for stack in valid_stacks if stack[0].height() > 0
                            and stack[0].min_container()[1] > container[1]
@@ -32,19 +37,6 @@ def MM_adopted_store_container(terminal: Terminal, container: Container, to_excl
     least_harmful = [(stack[0].min_container(), stack[1]) for stack in valid_stacks]
     least_harmful.sort(reverse=True)
     return terminal.store_container(least_harmful[0][1], container)
-
-#
-# def get_valid_stacks(terminal: Terminal, to_exclude: Optional[StackTierLocation], container: Container) -> List[Tuple[Stack, StackLocation]]:
-#     available_stacks = []
-#     for block_index in range(len(terminal.blocks)):
-#         block = terminal.blocks[block_index]
-#         for stack_index in range(len(block.stacks)):
-#             stack_location = (block_index, stack_index)
-#             if valid_store_location(terminal, stack_location, to_exclude) and not potential_blocking(terminal, stack_location, container):
-#                 stack = block.stacks[stack_index]
-#                 available_stacks.append((stack, (block_index, stack_index)))
-#     return available_stacks
-
 
 def potential_blocking(terminal: Terminal, stack_location: StackLocation, current_container: Container):
     block: Block = terminal.block(stack_location[0])

@@ -75,6 +75,14 @@ class EvaluatableEvents(Events):
                 for sample in data['evaluating_events']
             ]
             container_labels = data.get('container_labels', {})
+            if container_labels == {}:
+                batches = [batch.containers for batch in ev]
+                container_ids = list(set([container[0] for sublist in batches for container in sublist]))
+                for container_id in container_ids:
+                    container_labels[int(container_id)] = 0
+            else:
+                container_labels = {int(k):int(v) for k,v in container_labels.items()}
+
             return EvaluatableEvents(ev, training_events, evaluating_events, container_labels)
 
 
@@ -106,9 +114,9 @@ class EvaluatableEvents(Events):
         container_ids = list(set([container[0] for sublist in batches for container in sublist]))
         special_container_ids = random.sample(container_ids, nr_special)
         for container_id in container_ids:
-            container_labels[container_id] = 0
+            container_labels[int(container_id)] = 0
         for container_id in special_container_ids:
-            container_labels[container_id] = 1
+            container_labels[int(container_id)] = 1
 
         return cls(events.batches, training_events, evaluating_events, container_labels)
 

@@ -6,7 +6,7 @@ from main.model.dataclass.terminal import Terminal
 from main.model.events.events import Events
 
 
-def average_stack_height(terminal: Terminal, event: Events, current_batch_number: int, corridor: Optional[List[int]]) -> float:
+def average_stack_height(terminal: Terminal, event: Events, current_batch_number: int, corridor: Optional[List[int]], container_labels: dict) -> float:
     """
     Calculates the average stack height of non empty stacks
     :param terminal:

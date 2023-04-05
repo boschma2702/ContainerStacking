@@ -24,6 +24,10 @@ class TestCorridor(unittest.TestCase):
     def test_zero_corridor(self):
         self.assertListEqual([5], corridor(self.terminal, (5, 0, 0), 0, 0))
 
+    def test_no_corridor_designated(self):
+        self.assertCountEqual([0,1,2,3,4,5,6,7,8,9], corridor(self.designated_terminal, (3, 0, 0), -1, 0))
+        self.assertCountEqual([3,4,5,6,7], corridor(self.designated_terminal, (3, 0, 0), -1, 1))
+
     def test_single_corridor_1(self):
         self.assertCountEqual([4,5,6], corridor(self.terminal, (5, 0, 0), 1, 0))
 
@@ -53,3 +57,12 @@ class TestCorridor(unittest.TestCase):
 
     def test_with_no_corridor(self):
         self.assertCountEqual(list(range(10)), corridor(self.designated_terminal, (2, 0, 0), -1, 0))
+
+    def test_with_no_excluded(self):
+        self.assertCountEqual(list(range(10)), corridor(self.designated_terminal, None, -1, 0))
+
+    def test_with_no_excluded_2(self):
+        self.assertEqual(5, len(corridor(self.designated_terminal, None, 2, 0)))
+
+    def test_with_no_excluded_3(self):
+        self.assertEqual(5, len(corridor(self.designated_terminal, None, 2, 1)))

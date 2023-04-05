@@ -36,7 +36,7 @@ class ADP(Policy):
                  corridor_size: int = -1,
                  corridor_feature: int = -1
                  ):
-        super().__init__(events, initial_terminal)
+        super().__init__(events, initial_terminal, container_labels)
         # ADP settings
         self.single = single
         # self.epsilon = 0.25
@@ -67,7 +67,7 @@ class ADP(Policy):
     # Policy evaluation code
     ########################################################################################
     def handle_realized_inbound_batch(self, terminal: Terminal, realized_batch: RealizedBatch,
-                                      batch_number: int) -> Tuple[Terminal, int]:
+                                      batch_number: int, container_labels: dict) -> Tuple[Terminal, int]:
         if not self.use_optimized_outcomes:
             return self._best_choice(
                 terminal_unique_outcomes(terminal, realized_batch, self.corridor_size, self.container_labels),
@@ -79,7 +79,7 @@ class ADP(Policy):
                                               False, self.container_labels)[:-1]
 
     def handle_realized_outbound_batch(self, terminal: Terminal, realized_batch: RealizedBatch,
-                                       batch_number: int) -> Tuple[Terminal, int]:
+                                       batch_number: int, container_labels: dict) -> Tuple[Terminal, int]:
         if not self.use_optimized_outcomes:
             return self._best_choice(terminal_unique_outcomes(terminal, realized_batch, self.corridor_size, self.container_labels),
                                      batch_number)

@@ -112,7 +112,7 @@ def store_locations(terminal: Terminal, container: Container,
                     container_labels: dict) -> Set[Terminal]:
     result = set()
     blocks_visited = set()
-    for block_index in corridor(terminal, exclude_target_stack_tier_location, corridor_size):
+    for block_index in corridor(terminal, exclude_target_stack_tier_location, corridor_size, container_labels[container[0]]):
         block = terminal.blocks[block_index]
         if block not in blocks_visited:
             blocks_visited.add(block)
@@ -133,40 +133,33 @@ def container_allowed_in_block(block, container_label):
 
 def corridor(terminal: Terminal, exclude_target_stack_tier_location: Optional[StackTierLocation], corridor_size: int,
              container_label: int) -> List[int]:
-    # only use corridor if size is set
-    if corridor_size >= 0:
-        # if label = 0, then all places are available, otherwise limit to block equal to label
+    # if label = 0, then all places are available, otherwise limit to block equal to label
+    if container_label == 0:
+        block_indici = [i for i in range(0, terminal.nr_blocks())]
+    else:
+        block_indici = [i for i in range(0, terminal.nr_blocks()) if terminal.block(i).designated == container_label]
 
-        # get bay indices with correct label
-        if container_label == 0:
-            block_indici = [i for i in range(0, terminal.nr_blocks())]
-        else:
-            block_indici = [i for i in range(0, terminal.nr_blocks()) if terminal.block(i).designated == container_label]
+    # check if corridor spans all blocks or no corridor is supplied
+    if corridor_size == -1 or corridor_size*2 + 1 >= len(block_indici):
+        return block_indici
 
-        # check if corridor spans all blocks
-        if corridor_size*2 + 1 >= len(block_indici):
-            return block_indici
+    bay_index = exclude_target_stack_tier_location[0] if exclude_target_stack_tier_location else random.randint(0, len(block_indici)-1)
 
-        corridor_middle = exclude_target_stack_tier_location[0]
-        bay_index = corridor_middle if corridor_middle else random.randint(0, len(block_indici)-1)
+    # corridor contains at least the 'starting point'
+    corridor = [bay_index]
 
-        # corridor contains at least the 'starting point'
-        corridor = [bay_index]
+    if bay_index not in block_indici: bisect.insort(block_indici, bay_index)
 
-        if bay_index not in block_indici: bisect.insort(block_indici, bay_index)
+    # add corridor_size indici smaller in block_indici to corridor
+    bay_index_index = bisect.bisect(block_indici, bay_index) - 1
 
-        # add corridor_size indici smaller in block_indici to corridor
-        bay_index_index = bisect.bisect(block_indici, bay_index) - 1
+    for i in range(1, corridor_size+1):
+        up = (bay_index_index + i) % len(block_indici)
+        down = (bay_index_index - i) % len(block_indici)
+        corridor.append(block_indici[up])
+        corridor.append(block_indici[down])
 
-        for i in range(1, corridor_size+1):
-            up = (bay_index_index + i) % len(block_indici)
-            down = (bay_index_index - i) % len(block_indici)
-            corridor.append(block_indici[up])
-            corridor.append(block_indici[down])
-
-        return corridor
-
-    return list(range(terminal.nr_blocks()))
+    return corridor
 
 
 def valid_store_location(terminal: Terminal,

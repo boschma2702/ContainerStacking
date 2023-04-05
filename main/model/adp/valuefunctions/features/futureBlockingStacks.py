@@ -8,7 +8,7 @@ from main.model.dataclass.terminal import Terminal
 from main.model.events.events import Events
 
 
-def future_blocking_stacks(terminal: Terminal, event: Events, current_batch_number: int, corridor: Optional[List[int]]):
+def future_blocking_stacks(terminal: Terminal, event: Events, current_batch_number: int, corridor: Optional[List[int]], container_labels: dict):
     blocks = get_blocks(terminal, corridor)
     result = 0
     stacks = [stack for block in blocks for stack in block.stacks]
